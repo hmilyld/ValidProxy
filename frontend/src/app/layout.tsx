@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   description: "实时监控代理可用性与评分",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="zh-CN"
