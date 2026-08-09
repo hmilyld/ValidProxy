@@ -10,11 +10,8 @@ DATABASE_URL = "sqlite+aiosqlite:///./data/validproxy.db"
 VALIDATION_CONCURRENCY = 100
 VALIDATION_TIMEOUT = 5  # 单个验证超时(秒)
 VALIDATION_URLS = [
-    "https://ifconfig.io/all.json",
-    "https://api.ipify.org/",
-    "https://ipecho.net/plain",
-    "http://ipinfo.io/ip",
-    "http://ip-api.com/json",
+    "https://github.com/",
+    "https://www.githubstatus.com/",
 ]
 
 # 调度
