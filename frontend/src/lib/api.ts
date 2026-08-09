@@ -32,7 +32,6 @@ export interface ProxyStats {
   total: number;
   active: number;
   avg_score: number;
-  last_fetch_at: string | null;
   last_validation_at: string | null;
   protocol_distribution: Record<string, number>;
   country_top10: { country: string; count: number }[];

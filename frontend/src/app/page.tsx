@@ -1,131 +1,122 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense } from "react";
+import { SiteHeader } from "@/components/site-header";
+import { LiveStatus } from "@/components/live-status";
 import { StatsCards } from "@/components/stats-cards";
+import { OverviewCharts } from "@/components/overview-charts";
 import { FilterBar } from "@/components/filter-bar";
-import { ProxyTable } from "@/components/proxy-table";
-import { RefreshIndicator } from "@/components/refresh-indicator";
+import { ProxyList } from "@/components/proxy-list";
 import { useProxies } from "@/hooks/use-proxies";
-import { Separator } from "@/components/ui/separator";
+import { useProxyFilters, PAGE_SIZE } from "@/hooks/use-proxy-filters";
 
-export default function HomePage() {
-  const [protocol, setProtocol] = useState("");
-  const [anonymity, setAnonymity] = useState("");
-  const [minScore, setMinScore] = useState("");
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const [sortBy, setSortBy] = useState("score");
-  const [sortOrder, setSortOrder] = useState("desc");
+const REPO_URL = "https://github.com/hmilyld/ValidProxy";
+
+function GithubIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden className={className}>
+      <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+    </svg>
+  );
+}
+
+function DashboardContent() {
+  const {
+    state,
+    setFilters,
+    setPage,
+    handleSort,
+    hasActiveFilters,
+    clearFilters,
+  } = useProxyFilters();
 
   const { data, isLoading } = useProxies({
-    protocol: protocol || undefined,
-    anonymity: anonymity || undefined,
-    min_score: minScore ? Number(minScore) : undefined,
-    search: search || undefined,
-    page,
-    page_size: 20,
-    sort_by: sortBy,
-    sort_order: sortOrder,
+    protocol: state.protocol || undefined,
+    anonymity: state.anonymity || undefined,
+    country: state.country || undefined,
+    min_score: state.minScore ? Number(state.minScore) : undefined,
+    search: state.search || undefined,
+    page: state.page,
+    page_size: PAGE_SIZE,
+    sort_by: state.sortBy,
+    sort_order: state.sortOrder,
   });
 
-  const handleSort = (field: string) => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === "desc" ? "asc" : "desc");
-    } else {
-      setSortBy(field);
-      setSortOrder("desc");
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-[1400px] mx-auto p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">ValidProxy</h1>
-            <p className="text-muted-foreground mt-1">
-              代理验证工具 - 实时监控代理可用性与评分
+    <>
+      <SiteHeader />
+      <main
+        id="main"
+        className="mx-auto w-full max-w-[1400px] flex-1 px-4 pt-6 pb-16 sm:px-6"
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <h1 className="font-heading text-xl font-semibold tracking-tight sm:text-2xl">
+              代理监控
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              实时验证代理可用性，按综合评分排序挑选最优代理。
             </p>
           </div>
-          <RefreshIndicator />
+
+          <LiveStatus />
+
+          <StatsCards />
+
+          <OverviewCharts />
+
+          <FilterBar
+            filters={state}
+            onProtocolChange={(v) => setFilters({ protocol: v })}
+            onAnonymityChange={(v) => setFilters({ anonymity: v })}
+            onCountryChange={(v) => setFilters({ country: v })}
+            onMinScoreChange={(v) => setFilters({ minScore: v })}
+            onSearchChange={(v) => setFilters({ search: v })}
+            onClear={clearFilters}
+            hasActiveFilters={hasActiveFilters}
+          />
+
+          <ProxyList
+            proxies={data?.items ?? []}
+            total={data?.total ?? 0}
+            page={data?.page ?? state.page}
+            totalPages={data?.total_pages ?? 0}
+            isLoading={isLoading}
+            sortBy={state.sortBy}
+            sortOrder={state.sortOrder}
+            onSort={handleSort}
+            onPageChange={setPage}
+          />
         </div>
-
-        <Separator />
-
-        {/* Stats */}
-        <StatsCards />
-
-        {/* Filters */}
-        <FilterBar
-          protocol={protocol}
-          anonymity={anonymity}
-          minScore={minScore}
-          search={search}
-          onProtocolChange={(v) => {
-            setProtocol(v);
-            setPage(1);
-          }}
-          onAnonymityChange={(v) => {
-            setAnonymity(v);
-            setPage(1);
-          }}
-          onMinScoreChange={(v) => {
-            setMinScore(v);
-            setPage(1);
-          }}
-          onSearchChange={(v) => {
-            setSearch(v);
-            setPage(1);
-          }}
-        />
-
-        {/* Table */}
-        {isLoading && !data ? (
-          <div className="flex items-center justify-center h-64 text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              加载中...
-            </div>
+      </main>
+      <footer className="border-t">
+        <div className="mx-auto flex max-w-[1400px] flex-col items-center justify-between gap-2 px-4 py-4 text-xs text-muted-foreground sm:flex-row sm:px-6">
+          <div className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-center sm:text-left">
+            <span translate="no">ValidProxy</span>
+            <span aria-hidden>·</span>
+            <span>© {new Date().getFullYear()}</span>
+            <span aria-hidden>·</span>
+            <span>每 15 分钟自动验证更新</span>
           </div>
-        ) : (
-          <>
-            <ProxyTable
-              proxies={data?.items ?? []}
-              sortBy={sortBy}
-              sortOrder={sortOrder}
-              onSort={handleSort}
-            />
+          <a
+            href={REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-sm transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+          >
+            <GithubIcon aria-hidden className="size-3.5" />
+            <span>GitHub</span>
+          </a>
+        </div>
+      </footer>
+    </>
+  );
+}
 
-            {/* Pagination */}
-            {data && data.total_pages > 1 && (
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  共 {data.total} 个代理，第 {data.page}/{data.total_pages} 页
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setPage(Math.max(1, page - 1))}
-                    disabled={page <= 1}
-                    className="px-3 py-1 text-sm rounded-md border bg-secondary hover:bg-secondary/80 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    上一页
-                  </button>
-                  <button
-                    onClick={() =>
-                      setPage(Math.min(data.total_pages, page + 1))
-                    }
-                    disabled={page >= data.total_pages}
-                    className="px-3 py-1 text-sm rounded-md border bg-secondary hover:bg-secondary/80 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    下一页
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </div>
+export default function HomePage() {
+  return (
+    <Suspense fallback={null}>
+      <DashboardContent />
+    </Suspense>
   );
 }
