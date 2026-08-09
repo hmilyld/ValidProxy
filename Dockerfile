@@ -1,27 +1,15 @@
 # Stage 1: Build frontend
 FROM node:22-slim AS frontend-builder
 
-RUN corepack enable
 WORKDIR /app
 
-COPY frontend/package.json frontend/pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm install
 
 COPY frontend/ .
-RUN pnpm build
+RUN npm run build
 
-# Stage 2: Build backend
-FROM python:3.13-slim AS backend-builder
-
-WORKDIR /app
-RUN pip install --no-cache-dir uv
-
-COPY backend/pyproject.toml backend/uv.lock ./
-RUN uv pip install --system --no-cache -r requirements.txt 2>/dev/null || uv pip install --system --no-cache .
-
-COPY backend/ .
-
-# Stage 3: Final image
+# Stage 2: Final image
 FROM python:3.13-slim
 
 WORKDIR /app
@@ -33,9 +21,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Install backend dependencies
-COPY --from=backend-builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
-COPY --from=backend-builder /usr/local/bin /usr/local/bin
+# Install uv for Python package management
+RUN pip install --no-cache-dir uv
+
+# Copy backend dependencies
+COPY backend/pyproject.toml backend/uv.lock ./
+RUN uv pip install --system --no-cache . 2>/dev/null || uv pip install --system --no-cache -r requirements.txt
 
 # Copy backend code
 COPY backend/ /app/backend/
