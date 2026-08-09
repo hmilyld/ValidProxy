@@ -16,14 +16,20 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
+# 设置东八区(北京时间)
+ENV TZ=Asia/Shanghai
+
 # Install curl (entrypoint health check) + Node.js for the frontend standalone server
 RUN apt-get update && apt-get install -y --no-install-recommends \
     apt-transport-https \
     ca-certificates \
     curl \
     gnupg \
+    tzdata \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv for Python package management
