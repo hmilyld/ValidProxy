@@ -1,13 +1,12 @@
 """定时调度模块 - 每 15 分钟获取并验证代理"""
 
 import logging
-from datetime import datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.config import FETCH_INTERVAL_MINUTES
-from app.database import async_session
+from app.database import async_session, utcnow
 from app.fetcher import cleanup_failed_proxies, sync_proxies
 from app.routers.events import broadcast
 from app.scorer import update_all_scores
@@ -59,8 +58,7 @@ async def run_validation_cycle():
                 }
             )
 
-        async with async_session() as db:
-            val_stats = await validate_all(db, progress_callback=progress_cb)
+        val_stats = await validate_all(progress_callback=progress_cb)
 
         # 阶段 3: 更新评分
         await broadcast({"type": "progress", "data": {"status": "scoring", "message": "更新评分..."}})
@@ -79,7 +77,7 @@ async def run_validation_cycle():
                 "data": {
                     "status": "done",
                     "message": msg,
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": utcnow().isoformat(),
                 },
             }
         )
@@ -99,7 +97,7 @@ def start_scheduler():
         trigger=IntervalTrigger(minutes=FETCH_INTERVAL_MINUTES),
         id="validation_cycle",
         replace_existing=True,
-        next_run_time=datetime.utcnow(),  # 立即执行一次
+        next_run_time=utcnow(),  # 立即执行一次
     )
     scheduler.start()
     logger.info(f"调度器已启动，每 {FETCH_INTERVAL_MINUTES} 分钟执行一次")

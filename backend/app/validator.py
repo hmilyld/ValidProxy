@@ -1,21 +1,20 @@
-"""代理验证模块 - 50 并发异步验证"""
+"""代理验证模块 - 并发异步验证"""
 
 import asyncio
 import logging
 import time
-from datetime import datetime
 from typing import Callable, Optional
 
 import httpx
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import VALIDATION_CONCURRENCY, VALIDATION_TIMEOUT, VALIDATION_URLS
+from app.database import async_session, utcnow
 from app.models import Proxy
 
 logger = logging.getLogger(__name__)
 
-# 当前可用的验证 URL 索引
+# 当前可用的验证 URL 索引（支持故障切换）
 _current_url_index = 0
 _url_failures = [0] * len(VALIDATION_URLS)
 
@@ -27,7 +26,7 @@ def _get_next_url() -> str:
     if _url_failures[_current_url_index] >= 3:
         _url_failures[_current_url_index] = 0
         _current_url_index = (_current_url_index + 1) % len(VALIDATION_URLS)
-        logger.info(f"切换验证 URL: {VALIDATION_URLS[_current_url_index]}")
+        logger.info("切换验证 URL: %s", VALIDATION_URLS[_current_url_index])
     return VALIDATION_URLS[_current_url_index]
 
 
@@ -49,41 +48,36 @@ def _record_url_success(url: str):
         pass
 
 
-async def _validate_single(proxy: Proxy, client: httpx.AsyncClient) -> tuple[int, bool, float, Optional[str]]:
-    """验证单个代理，返回 (proxy_id, success, response_time_ms, error)"""
+async def _validate_proxy(proxy: Proxy) -> tuple[bool, float]:
+    """验证单个代理，返回 (success, response_time_ms)"""
     url = _get_next_url()
+    start = time.monotonic()
     try:
-        start = time.monotonic()
-        resp = await client.get(url, follow_redirects=True)
+        async with httpx.AsyncClient(timeout=VALIDATION_TIMEOUT, proxy=proxy.proxy) as client:
+            resp = await client.get(url, follow_redirects=True)
         elapsed_ms = (time.monotonic() - start) * 1000
         success = resp.status_code == 200
-        error = None if success else f"HTTP {resp.status_code}"
         if success:
             _record_url_success(url)
-            logger.debug(f"✓ {proxy.proxy} - {elapsed_ms:.0f}ms")
+            logger.debug("✓ %s - %.0fms", proxy.proxy, elapsed_ms)
         else:
             _record_url_failure(url)
-        return (proxy.id, success, elapsed_ms, error)
+        return success, elapsed_ms
     except httpx.TimeoutException:
-        elapsed_ms = (time.monotonic() - start) * 1000
         _record_url_failure(url)
-        return (proxy.id, False, elapsed_ms, "Timeout")
-    except Exception as e:
-        elapsed_ms = (time.monotonic() - start) * 1000
+        return False, (time.monotonic() - start) * 1000
+    except Exception:
         _record_url_failure(url)
-        return (proxy.id, False, elapsed_ms, str(type(e).__name__))
+        return False, (time.monotonic() - start) * 1000
 
 
-async def validate_all(
-    db: AsyncSession,
-    progress_callback: Optional[Callable] = None,
-) -> dict:
+async def validate_all(progress_callback: Optional[Callable] = None) -> dict:
     """批量验证所有代理"""
-    # 获取所有代理
-    result = await db.execute(select(Proxy))
-    proxies = result.scalars().all()
+    async with async_session() as db:
+        result = await db.execute(select(Proxy))
+        proxies = result.scalars().all()
     total = len(proxies)
-    logger.info(f"开始验证 {total} 个代理...")
+    logger.info("开始验证 %d 个代理...", total)
 
     validated = 0
     success = 0
@@ -92,49 +86,39 @@ async def validate_all(
     async def _limited_validate(proxy: Proxy):
         nonlocal validated, success
         async with semaphore:
-            try:
-                async with httpx.AsyncClient(
-                    timeout=VALIDATION_TIMEOUT,
-                    proxy=proxy.proxy,
-                ) as proxy_client:
-                    proxy_id, ok, resp_time, _ = await _validate_single(proxy, proxy_client)
-            except Exception:
-                proxy_id, ok, resp_time = proxy.id, False, 0
+            ok, resp_time = await _validate_proxy(proxy)
+
+            # 每个任务使用独立的会话更新数据库，避免共享会话并发访问
+            async with async_session() as s:
+                p = await s.get(Proxy, proxy.id)
+                if p:
+                    p.total_checks += 1
+                    p.last_checked_at = utcnow()
+                    p.response_time_ms = round(resp_time, 1)
+                    if ok:
+                        p.success_checks += 1
+                        p.consecutive_successes += 1
+                        p.consecutive_failures = 0
+                        p.last_success_at = utcnow()
+                    else:
+                        p.consecutive_successes = 0
+                        p.consecutive_failures += 1
+                    p.success_rate = round(p.success_checks / p.total_checks, 4) if p.total_checks > 0 else 0.0
+                    p.updated_at = utcnow()
+                await s.commit()
 
             validated += 1
             if ok:
                 success += 1
 
-            # 更新数据库
-            p = await db.get(Proxy, proxy_id)
-            if p:
-                p.total_checks += 1
-                p.last_checked_at = datetime.utcnow()
-                p.response_time_ms = round(resp_time, 1)
-                if ok:
-                    p.success_checks += 1
-                    p.consecutive_successes += 1
-                    p.last_success_at = datetime.utcnow()
-                else:
-                    p.consecutive_successes = 0
-                p.success_rate = round(p.success_checks / p.total_checks, 4) if p.total_checks > 0 else 0
-                p.updated_at = datetime.utcnow()
-
-            # 进度回调
             if progress_callback and validated % 100 == 0:
-                logger.info(f"进度: {validated}/{total} (成功: {success}, 失败: {validated - success})")
+                logger.info("进度: %d/%d (成功: %d, 失败: %d)", validated, total, success, validated - success)
                 await progress_callback(validated, total, success)
 
-    # 批量验证
+    # 分批并发验证（每批不超过并发上限）
     tasks = [_limited_validate(p) for p in proxies]
-    for i in range(0, len(tasks), 100):
-        batch = tasks[i : i + 100]
-        await asyncio.gather(*batch)
-        await db.commit()
-        logger.info(f"进度: {validated}/{total} (成功: {success})")
+    for i in range(0, len(tasks), VALIDATION_CONCURRENCY):
+        await asyncio.gather(*tasks[i : i + VALIDATION_CONCURRENCY])
 
-    await db.commit()
-
-    stats = {"total": total, "validated": validated, "success": success}
-    logger.info(f"验证完成: {stats}")
-    return stats
+    logger.info("验证完成: 共 %d 个, 成功 %d 个", total, success)
+    return {"total": total, "validated": validated, "success": success}

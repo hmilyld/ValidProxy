@@ -28,6 +28,7 @@ class Proxy(Base):
     total_checks = Column(Integer, default=0)
     success_checks = Column(Integer, default=0)
     consecutive_successes = Column(Integer, default=0)
+    consecutive_failures = Column(Integer, default=0)
 
     # 时间戳
     last_checked_at = Column(DateTime, nullable=True)

@@ -6,6 +6,10 @@ dist/
 build/
 .venv/
 *.db
+*.db-journal
+*.db-wal
+*.db-shm
+backend/data/
 .ruff_cache/
 
 # Node

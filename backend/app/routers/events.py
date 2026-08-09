@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-from typing import AsyncGenerator
 
 from fastapi import APIRouter
 from sse_starlette.sse import EventSourceResponse
@@ -23,19 +22,6 @@ async def broadcast(event: dict):
             dead.append(q)
     for q in dead:
         _subscribers.remove(q)
-
-
-async def _event_generator(queue: AsyncGenerator) -> AsyncGenerator:
-    """生成 SSE 事件流"""
-    try:
-        while True:
-            event = await queue.get()
-            yield {
-                "event": event.get("type", "message"),
-                "data": json.dumps(event.get("data", {})),
-            }
-    except asyncio.CancelledError:
-        pass
 
 
 @router.get("/api/events")

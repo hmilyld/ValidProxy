@@ -3,7 +3,7 @@
 import math
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -112,7 +112,5 @@ async def get_proxy(proxy_id: int, db: AsyncSession = Depends(get_db)):
     """获取单个代理详情"""
     proxy = await db.get(Proxy, proxy_id)
     if not proxy:
-        from fastapi import HTTPException
-
         raise HTTPException(status_code=404, detail="Proxy not found")
     return ProxyResponse.model_validate(proxy)

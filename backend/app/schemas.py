@@ -32,7 +32,6 @@ class ProxyStats(BaseModel):
     total: int
     active: int  # score > 0 的
     avg_score: float
-    last_fetch_at: Optional[datetime] = None
     last_validation_at: Optional[datetime] = None
     protocol_distribution: dict[str, int]
     country_top10: list[dict]

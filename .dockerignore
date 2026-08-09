@@ -1,0 +1,29 @@
+# Version control
+.git
+.gitignore
+.github
+.claude
+
+# Local runtime data
+.logs
+.pids
+
+# Backend
+backend/.venv
+backend/.ruff_cache
+backend/data
+backend/validproxy.db
+**/__pycache__/
+*.pyc
+
+# Frontend
+frontend/node_modules
+frontend/.next
+frontend/out
+frontend/tsconfig.tsbuildinfo
+frontend/next-env.d.ts
+
+# Environment
+.env
+.env.local
+.env.*.local

@@ -1,9 +1,9 @@
 services:
   validproxy:
     build: .
+    # 仅暴露前端端口 5173；后端(18001) 只在容器内被前端代理访问，不对外暴露
     ports:
       - "5173:5173"
-      - "18001:18001"
     volumes:
       - backend-data:/app/backend/data
     restart: unless-stopped

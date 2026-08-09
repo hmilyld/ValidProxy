@@ -3,8 +3,8 @@
 # 代理数据源 URL
 PROXY_SOURCE_URL = "https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/all/data.json"
 
-# 数据库
-DATABASE_URL = "sqlite+aiosqlite:///./validproxy.db"
+# 数据库（data 目录由 database.py 自动创建，Docker 卷挂载持久化）
+DATABASE_URL = "sqlite+aiosqlite:///./data/validproxy.db"
 
 # 验证设置
 VALIDATION_CONCURRENCY = 100
