@@ -4,6 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScoreBadge } from "@/components/score-badge";
 import { ProtocolBadge } from "@/components/badges";
+import { CopyProxyButton } from "@/components/copy-proxy-button";
+import { TestProxyButton } from "@/components/test-proxy-button";
 import { formatLatency, formatPercent, formatTimeAgo } from "@/lib/format";
 import type { ProxyItem } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -38,9 +40,13 @@ export function ProxyCards({ proxies, isLoading, className }: ProxyCardsProps) {
           <CardContent className="p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="truncate font-mono text-sm font-medium">
-                  {p.proxy}
-                </p>
+                <div className="flex items-center gap-1">
+                  <p className="truncate font-mono text-sm font-medium">
+                    {p.proxy}
+                  </p>
+                  <CopyProxyButton value={p.proxy} />
+                  <TestProxyButton value={p.proxy} />
+                </div>
                 <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
                   <ProtocolBadge protocol={p.protocol} https={p.https} />
                   <span className="truncate">{p.country || "-"}</span>

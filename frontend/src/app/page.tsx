@@ -96,7 +96,7 @@ function DashboardContent() {
             <span aria-hidden>·</span>
             <span>© {new Date().getFullYear()}</span>
             <span aria-hidden>·</span>
-            <span>每 15 分钟自动验证更新</span>
+            <span>每小时自动验证更新</span>
           </div>
           <a
             href={REPO_URL}

@@ -11,6 +11,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScoreBadge } from "@/components/score-badge";
 import { ProtocolBadge, AnonymityBadge } from "@/components/badges";
+import { CopyProxyButton } from "@/components/copy-proxy-button";
+import { TestProxyButton } from "@/components/test-proxy-button";
 import { formatLatency, formatPercent, formatTimeAgo } from "@/lib/format";
 import type { ProxyItem } from "@/lib/api";
 import type { SortOrder } from "@/hooks/use-proxy-filters";
@@ -127,9 +129,13 @@ export function ProxyTable({
             : proxies.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell>
-                    <span className="block max-w-[220px] truncate font-mono text-xs">
-                      {p.proxy}
-                    </span>
+                    <div className="flex items-center gap-1">
+                      <span className="block max-w-[200px] truncate font-mono text-xs">
+                        {p.proxy}
+                      </span>
+                      <CopyProxyButton value={p.proxy} />
+                      <TestProxyButton value={p.proxy} />
+                    </div>
                   </TableCell>
                   <TableCell>
                     <ProtocolBadge protocol={p.protocol} https={p.https} />

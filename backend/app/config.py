@@ -15,10 +15,14 @@ VALIDATION_URLS = [
 ]
 
 # 调度
-FETCH_INTERVAL_MINUTES = 15
+FETCH_INTERVAL_MINUTES = 60
 
 # 清理策略
 MAX_CONSECUTIVE_FAILURES = 3  # 连续失败 N 次后自动删除
+
+# 单次代理测试（POST /api/proxies/test）
+PROXY_TEST_CONCURRENCY = 10  # 全局并发上限
+PROXY_TEST_RATE_LIMIT = 30  # 每 IP 每分钟最多测试次数
 
 # 评分权重
 SCORE_WEIGHTS = {

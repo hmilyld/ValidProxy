@@ -51,3 +51,13 @@ class ValidationProgress(BaseModel):
     validated: int = 0
     success: int = 0
     message: str = ""
+
+
+class ProxyTestRequest(BaseModel):
+    proxy: str
+
+
+class ProxyTestResponse(BaseModel):
+    success: bool
+    response_time_ms: float = 0.0
+    error: Optional[str] = None

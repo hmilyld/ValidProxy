@@ -69,3 +69,22 @@ export async function fetchStats(): Promise<ProxyStats> {
   if (!res.ok) throw new Error("Failed to fetch stats");
   return res.json();
 }
+
+export interface ProxyTestResult {
+  success: boolean;
+  response_time_ms: number;
+  error?: string | null;
+}
+
+export async function testProxy(proxy: string): Promise<ProxyTestResult> {
+  const res = await fetch(`${API_BASE}/api/proxies/test`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ proxy }),
+  });
+  if (res.status === 429) {
+    return { success: false, response_time_ms: 0, error: "测试过于频繁，请稍后再试" };
+  }
+  if (!res.ok) throw new Error("Failed to test proxy");
+  return res.json();
+}

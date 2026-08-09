@@ -48,18 +48,18 @@ def _record_url_success(url: str):
         pass
 
 
-async def _validate_proxy(proxy: Proxy) -> tuple[bool, float]:
-    """验证单个代理，返回 (success, response_time_ms)"""
-    url = _get_next_url()
+async def validate_single_proxy(proxy_url: str, url: Optional[str] = None) -> tuple[bool, float]:
+    """验证单个代理地址，返回 (success, response_time_ms)"""
+    url = url or _get_next_url()
     start = time.monotonic()
     try:
-        async with httpx.AsyncClient(timeout=VALIDATION_TIMEOUT, proxy=proxy.proxy) as client:
+        async with httpx.AsyncClient(timeout=VALIDATION_TIMEOUT, proxy=proxy_url) as client:
             resp = await client.get(url, follow_redirects=True)
         elapsed_ms = (time.monotonic() - start) * 1000
         success = resp.status_code == 200
         if success:
             _record_url_success(url)
-            logger.debug("✓ %s - %.0fms", proxy.proxy, elapsed_ms)
+            logger.debug("✓ %s - %.0fms", proxy_url, elapsed_ms)
         else:
             _record_url_failure(url)
         return success, elapsed_ms
@@ -69,6 +69,11 @@ async def _validate_proxy(proxy: Proxy) -> tuple[bool, float]:
     except Exception:
         _record_url_failure(url)
         return False, (time.monotonic() - start) * 1000
+
+
+async def _validate_proxy(proxy: Proxy) -> tuple[bool, float]:
+    """验证数据库中的单个代理，返回 (success, response_time_ms)"""
+    return await validate_single_proxy(proxy.proxy)
 
 
 async def validate_all(progress_callback: Optional[Callable] = None) -> dict:

@@ -85,7 +85,7 @@ export function StatsCards() {
       value: stats?.last_validation_at
         ? formatTimeAgo(stats.last_validation_at)
         : "-",
-      description: "每 15 分钟自动更新",
+      description: "每小时自动更新",
       icon: ClockIcon,
       loading: isLoading || !stats,
     },

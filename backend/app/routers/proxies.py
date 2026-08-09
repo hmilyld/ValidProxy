@@ -1,17 +1,46 @@
 """代理列表 API 路由"""
 
+import asyncio
 import math
+import time
+from collections import defaultdict, deque
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import PROXY_TEST_CONCURRENCY, PROXY_TEST_RATE_LIMIT
 from app.database import get_db
 from app.models import Proxy
-from app.schemas import PaginatedResponse, ProxyResponse, ProxyStats
+from app.proxy_utils import assert_public_host, normalize_proxy_url
+from app.schemas import (
+    PaginatedResponse,
+    ProxyResponse,
+    ProxyStats,
+    ProxyTestRequest,
+    ProxyTestResponse,
+)
+from app.validator import validate_single_proxy
 
 router = APIRouter(prefix="/api/proxies", tags=["proxies"])
+
+# 单次测试的限流与并发控制
+_RATE_WINDOW_SECONDS = 60
+_rate_log: dict[str, deque[float]] = defaultdict(deque)
+_test_semaphore = asyncio.Semaphore(PROXY_TEST_CONCURRENCY)
+
+
+def _check_rate_limit(client_ip: str) -> bool:
+    """简单内存滑动窗口限流，返回是否允许本次请求"""
+    now = time.monotonic()
+    q = _rate_log[client_ip]
+    while q and now - q[0] > _RATE_WINDOW_SECONDS:
+        q.popleft()
+    if len(q) >= PROXY_TEST_RATE_LIMIT:
+        return False
+    q.append(now)
+    return True
 
 
 @router.get("", response_model=PaginatedResponse)
@@ -105,6 +134,25 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
         protocol_distribution=protocol_distribution,
         country_top10=country_top10,
     )
+
+
+@router.post("/test", response_model=ProxyTestResponse)
+async def test_proxy(payload: ProxyTestRequest, request: Request):
+    """一次性测试单个代理的可用性（服务器视角）"""
+    client_ip = request.client.host if request.client else "unknown"
+    if not _check_rate_limit(client_ip):
+        raise HTTPException(status_code=429, detail="测试过于频繁，请稍后再试")
+
+    try:
+        proxy_url = normalize_proxy_url(payload.proxy)
+        assert_public_host(proxy_url)
+    except ValueError as e:
+        return ProxyTestResponse(success=False, response_time_ms=0.0, error=str(e))
+
+    async with _test_semaphore:
+        ok, response_time_ms = await validate_single_proxy(proxy_url)
+
+    return ProxyTestResponse(success=ok, response_time_ms=round(response_time_ms, 1))
 
 
 @router.get("/{proxy_id}", response_model=ProxyResponse)
