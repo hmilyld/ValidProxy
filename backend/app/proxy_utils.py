@@ -31,12 +31,7 @@ def normalize_proxy_url(raw: str) -> str:
 
 def _is_public_ip(ip: ipaddress._BaseAddress) -> bool:
     return not (
-        ip.is_private
-        or ip.is_loopback
-        or ip.is_link_local
-        or ip.is_reserved
-        or ip.is_multicast
-        or ip.is_unspecified
+        ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified
     )
 
 
