@@ -6,6 +6,7 @@ dist/
 build/
 .venv/
 *.db
+.ruff_cache/
 
 # Node
 node_modules/

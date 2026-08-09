@@ -3,7 +3,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import SCORE_WEIGHTS, PROTOCOL_SCORES, ANONYMITY_SCORES
+from app.config import ANONYMITY_SCORES, PROTOCOL_SCORES, SCORE_WEIGHTS
 from app.models import Proxy
 
 

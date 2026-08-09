@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import engine
 from app.models import Base
-from app.routers import proxies, events
+from app.routers import events, proxies
 from app.scheduler import start_scheduler, stop_scheduler
 
 logging.basicConfig(

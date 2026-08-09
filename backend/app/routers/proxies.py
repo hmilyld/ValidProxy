@@ -1,7 +1,6 @@
 """代理列表 API 路由"""
 
 import math
-from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -41,9 +40,7 @@ async def list_proxies(
     if min_score is not None:
         query = query.where(Proxy.score >= min_score)
     if search:
-        query = query.where(
-            Proxy.ip.contains(search) | Proxy.proxy.contains(search)
-        )
+        query = query.where(Proxy.ip.contains(search) | Proxy.proxy.contains(search))
 
     # 统计总数
     count_query = select(func.count()).select_from(query.subquery())
@@ -79,17 +76,13 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
     total = (await db.execute(select(func.count(Proxy.id)))).scalar() or 0
 
     # 可用数 (score > 0)
-    active = (
-        await db.execute(select(func.count(Proxy.id)).where(Proxy.score > 0))
-    ).scalar() or 0
+    active = (await db.execute(select(func.count(Proxy.id)).where(Proxy.score > 0))).scalar() or 0
 
     # 平均分
     avg_score = (await db.execute(select(func.avg(Proxy.score)))).scalar() or 0
 
     # 协议分布
-    protocol_dist_result = await db.execute(
-        select(Proxy.protocol, func.count(Proxy.id)).group_by(Proxy.protocol)
-    )
+    protocol_dist_result = await db.execute(select(Proxy.protocol, func.count(Proxy.id)).group_by(Proxy.protocol))
     protocol_distribution = {row[0]: row[1] for row in protocol_dist_result.all()}
 
     # 国家 Top 10
@@ -102,11 +95,7 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
     country_top10 = [{"country": row[0], "count": row[1]} for row in country_result.all()]
 
     # 最后验证时间
-    last_validation = (
-        await db.execute(
-            select(func.max(Proxy.last_checked_at))
-        )
-    ).scalar()
+    last_validation = (await db.execute(select(func.max(Proxy.last_checked_at)))).scalar()
 
     return ProxyStats(
         total=total,
@@ -124,5 +113,6 @@ async def get_proxy(proxy_id: int, db: AsyncSession = Depends(get_db)):
     proxy = await db.get(Proxy, proxy_id)
     if not proxy:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail="Proxy not found")
     return ProxyResponse.model_validate(proxy)

@@ -48,7 +48,7 @@ export function RefreshIndicator() {
       clearTimeout(reconnectTimer);
       eventSource?.close();
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!progress) {
     return (

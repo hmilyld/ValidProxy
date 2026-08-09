@@ -49,9 +49,7 @@ def _record_url_success(url: str):
         pass
 
 
-async def _validate_single(
-    proxy: Proxy, client: httpx.AsyncClient
-) -> tuple[int, bool, float, Optional[str]]:
+async def _validate_single(proxy: Proxy, client: httpx.AsyncClient) -> tuple[int, bool, float, Optional[str]]:
     """验证单个代理，返回 (proxy_id, success, response_time_ms, error)"""
     url = _get_next_url()
     try:
@@ -99,9 +97,9 @@ async def validate_all(
                     timeout=VALIDATION_TIMEOUT,
                     proxy=proxy.proxy,
                 ) as proxy_client:
-                    proxy_id, ok, resp_time, error = await _validate_single(proxy, proxy_client)
-            except Exception as e:
-                proxy_id, ok, resp_time, error = proxy.id, False, 0, str(type(e).__name__)
+                    proxy_id, ok, resp_time, _ = await _validate_single(proxy, proxy_client)
+            except Exception:
+                proxy_id, ok, resp_time = proxy.id, False, 0
 
             validated += 1
             if ok:

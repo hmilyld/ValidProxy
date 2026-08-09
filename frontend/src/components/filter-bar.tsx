@@ -45,7 +45,7 @@ export function FilterBar({
 
       <Select
         value={protocol || "__all__"}
-        onValueChange={(v) => onProtocolChange(v === "__all__" ? "" : v)}
+        onValueChange={(v: string | null) => onProtocolChange(v === "__all__" || !v ? "" : v)}
       >
         <SelectTrigger className="w-[130px]">
           <SelectValue placeholder="协议" />
@@ -60,7 +60,7 @@ export function FilterBar({
 
       <Select
         value={anonymity || "__all__"}
-        onValueChange={(v) => onAnonymityChange(v === "__all__" ? "" : v)}
+        onValueChange={(v: string | null) => onAnonymityChange(v === "__all__" || !v ? "" : v)}
       >
         <SelectTrigger className="w-[130px]">
           <SelectValue placeholder="匿名等级" />
@@ -74,7 +74,7 @@ export function FilterBar({
 
       <Select
         value={minScore || "__all__"}
-        onValueChange={(v) => onMinScoreChange(v === "__all__" ? "" : v)}
+        onValueChange={(v: string | null) => onMinScoreChange(v === "__all__" || !v ? "" : v)}
       >
         <SelectTrigger className="w-[130px]">
           <SelectValue placeholder="最低评分" />

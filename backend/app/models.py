@@ -1,7 +1,6 @@
 """SQLAlchemy ORM 模型"""
 
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, func
+from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String, func
 from sqlalchemy.orm import DeclarativeBase
 
 

@@ -1,0 +1,26 @@
+[project]
+name = "validproxy-backend"
+version = "0.1.0"
+description = "ValidProxy Backend"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "sqlalchemy>=2.0",
+    "httpx[socks]>=0.27.0",
+    "apscheduler>=3.10.0",
+    "aiosqlite>=0.20.0",
+    "pydantic>=2.0",
+    "sse-starlette>=2.0",
+    "ruff>=0.16.2",
+]
+
+[tool.ruff]
+line-length = 120
+
+[[tool.uv.index]]
+url = "https://mirrors.aliyun.com/pypi/simple"
+default = true
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]

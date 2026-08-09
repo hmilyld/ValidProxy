@@ -7,7 +7,7 @@ import httpx
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import PROXY_SOURCE_URL, MAX_CONSECUTIVE_FAILURES
+from app.config import MAX_CONSECUTIVE_FAILURES, PROXY_SOURCE_URL
 from app.models import Proxy
 
 logger = logging.getLogger(__name__)

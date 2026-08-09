@@ -1,6 +1,5 @@
 """定时调度模块 - 每 15 分钟获取并验证代理"""
 
-import asyncio
 import logging
 from datetime import datetime
 
@@ -9,10 +8,10 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from app.config import FETCH_INTERVAL_MINUTES
 from app.database import async_session
-from app.fetcher import sync_proxies, cleanup_failed_proxies
+from app.fetcher import cleanup_failed_proxies, sync_proxies
+from app.routers.events import broadcast
 from app.scorer import update_all_scores
 from app.validator import validate_all
-from app.routers.events import broadcast
 
 logger = logging.getLogger(__name__)
 
@@ -33,22 +32,32 @@ async def run_validation_cycle():
         await broadcast({"type": "progress", "data": {"status": "fetching", "message": "正在获取代理列表..."}})
         async with async_session() as db:
             fetch_stats = await sync_proxies(db)
-        await broadcast({"type": "progress", "data": {
-            "status": "fetching_done",
-            "message": f"获取完成: 新增 {fetch_stats['added']}, 更新 {fetch_stats['updated']}",
-        }})
+        await broadcast(
+            {
+                "type": "progress",
+                "data": {
+                    "status": "fetching_done",
+                    "message": f"获取完成: 新增 {fetch_stats['added']}, 更新 {fetch_stats['updated']}",
+                },
+            }
+        )
 
         # 阶段 2: 验证
         await broadcast({"type": "progress", "data": {"status": "validating", "message": "开始验证代理..."}})
 
         async def progress_cb(validated, total, success):
-            await broadcast({"type": "progress", "data": {
-                "status": "validating",
-                "total": total,
-                "validated": validated,
-                "success": success,
-                "message": f"验证进度: {validated}/{total} (成功: {success})",
-            }})
+            await broadcast(
+                {
+                    "type": "progress",
+                    "data": {
+                        "status": "validating",
+                        "total": total,
+                        "validated": validated,
+                        "success": success,
+                        "message": f"验证进度: {validated}/{total} (成功: {success})",
+                    },
+                }
+            )
 
         async with async_session() as db:
             val_stats = await validate_all(db, progress_callback=progress_cb)
@@ -56,18 +65,24 @@ async def run_validation_cycle():
         # 阶段 3: 更新评分
         await broadcast({"type": "progress", "data": {"status": "scoring", "message": "更新评分..."}})
         async with async_session() as db:
-            updated_count = await update_all_scores(db)
+            await update_all_scores(db)
 
         # 阶段 4: 清理失效代理
         async with async_session() as db:
             cleaned = await cleanup_failed_proxies(db)
 
         # 完成
-        await broadcast({"type": "progress", "data": {
-            "status": "done",
-            "message": f"验证完成! 共 {val_stats['validated']} 个, 成功 {val_stats['success']} 个, 清理 {cleaned} 个失效代理",
-            "timestamp": datetime.utcnow().isoformat(),
-        }})
+        msg = f"验证完成! 共 {val_stats['validated']} 个, 成功 {val_stats['success']} 个, 清理 {cleaned} 个失效代理"
+        await broadcast(
+            {
+                "type": "progress",
+                "data": {
+                    "status": "done",
+                    "message": msg,
+                    "timestamp": datetime.utcnow().isoformat(),
+                },
+            }
+        )
         logger.info(f"验证周期完成: {val_stats}, 清理: {cleaned}")
 
     except Exception as e:
