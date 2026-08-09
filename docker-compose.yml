@@ -1,18 +1,11 @@
 services:
-  backend:
-    build: ./backend
-    ports:
-      - "18001:18001"
-    volumes:
-      - backend-data:/app/data
-    restart: unless-stopped
-
-  frontend:
-    build: ./frontend
+  validproxy:
+    build: .
     ports:
       - "5173:5173"
-    depends_on:
-      - backend
+      - "18001:18001"
+    volumes:
+      - backend-data:/app/backend/data
     restart: unless-stopped
 
 volumes:
