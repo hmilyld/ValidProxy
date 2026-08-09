@@ -1,6 +1,15 @@
 #!/bin/bash
 set -e
 
+# Ensure the SQLite data directory exists and is writable
+DATA_DIR=/app/backend/data
+mkdir -p "$DATA_DIR"
+chmod -R a+rwX "$DATA_DIR" 2>/dev/null || true
+if [ ! -w "$DATA_DIR" ]; then
+    echo "ERROR: $DATA_DIR is not writable. Please check the data volume permissions." >&2
+    exit 1
+fi
+
 # Start backend (仅容器内部可达，对外只暴露前端 5173)
 cd /app/backend
 uvicorn app.main:app --host 0.0.0.0 --port 18001 &

@@ -12,7 +12,8 @@ db_dir = os.path.dirname(DATABASE_URL.removeprefix("sqlite+aiosqlite:///"))
 if db_dir:
     os.makedirs(db_dir, exist_ok=True)
 
-engine = create_async_engine(DATABASE_URL, echo=False)
+# timeout: SQLite 连接繁忙超时（秒），避免并发验证时的 "database is locked"
+engine = create_async_engine(DATABASE_URL, echo=False, connect_args={"timeout": 30})
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
