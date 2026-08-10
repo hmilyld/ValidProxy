@@ -51,6 +51,7 @@ async def list_proxies(
     country: Optional[str] = None,
     anonymity: Optional[str] = None,
     min_score: Optional[float] = Query(None, ge=0, le=100),
+    include_invalid: bool = Query(False, description="是否包含无效代理（score<=0）"),
     sort_by: str = Query("score", pattern="^(score|response_time_ms|success_rate|last_checked_at|country)$"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     search: Optional[str] = None,
@@ -60,6 +61,8 @@ async def list_proxies(
     query = select(Proxy)
 
     # 筛选
+    if not include_invalid:
+        query = query.where(Proxy.score > 0)
     if protocol:
         query = query.where(Proxy.protocol == protocol)
     if country:

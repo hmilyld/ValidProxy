@@ -3,6 +3,7 @@
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
@@ -77,7 +78,9 @@ function SortMenu({
         }
       />
       <DropdownMenuContent align="end">
-        <DropdownMenuLabel>排序方式</DropdownMenuLabel>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>排序方式</DropdownMenuLabel>
+        </DropdownMenuGroup>
         {SORT_OPTIONS.map((opt) => (
           <DropdownMenuItem
             key={opt.value}

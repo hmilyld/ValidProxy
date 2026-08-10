@@ -70,7 +70,7 @@ pnpm dev                    # http://localhost:5173
 
 ## API 接口
 
-- `GET /api/proxies` - 分页获取代理列表（支持 protocol/country/anonymity/min_score/search 筛选与排序）
+- `GET /api/proxies` - 分页获取代理列表（默认仅返回有效代理，即 score>0；支持 protocol/country/anonymity/min_score/search 筛选与排序，`include_invalid=true` 可包含无效代理）
 - `GET /api/proxies/stats` - 统计概览（总数、可用数、平均分、协议分布、国家 Top10）
 - `GET /api/proxies/{id}` - 单个代理详情
 - `GET /api/events` - SSE 实时事件流（获取/验证/评分进度）
