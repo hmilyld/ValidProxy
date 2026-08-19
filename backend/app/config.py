@@ -17,6 +17,11 @@ VALIDATION_URLS = [
 # 调度
 FETCH_INTERVAL_MINUTES = 60
 
+# 各阶段超时（秒），防止某个 await 永久挂起而卡死调度器
+FETCH_TIMEOUT_SECONDS = 300  # 获取+同步入库阶段上限
+SCORING_TIMEOUT_SECONDS = 300  # 评分/清理阶段上限
+VALIDATION_CYCLE_TIMEOUT_SECONDS = 7200  # 整周期兜底上限（2 小时），超过强制中止本轮
+
 # 清理策略
 MAX_CONSECUTIVE_FAILURES = 3  # 连续失败 N 次后自动删除
 

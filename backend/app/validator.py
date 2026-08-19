@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import math
 import time
 from typing import Callable, Optional
 
@@ -17,6 +18,9 @@ logger = logging.getLogger(__name__)
 # 当前可用的验证 URL 索引（支持故障切换）
 _current_url_index = 0
 _url_failures = [0] * len(VALIDATION_URLS)
+
+# 批量写库大小（减少 SQLite 写锁竞争与连接池排队）
+DB_WRITE_BATCH_SIZE = 100
 
 
 def _get_next_url() -> str:
@@ -54,7 +58,8 @@ async def validate_single_proxy(proxy_url: str, url: Optional[str] = None) -> tu
     start = time.monotonic()
     try:
         async with httpx.AsyncClient(timeout=VALIDATION_TIMEOUT, proxy=proxy_url) as client:
-            resp = await client.get(url, follow_redirects=True)
+            # asyncio.wait_for 兜底：httpx 的 timeout 不覆盖 DNS 解析（worker 线程），防止线程卡死导致任务挂起
+            resp = await asyncio.wait_for(client.get(url, follow_redirects=True), timeout=VALIDATION_TIMEOUT)
         elapsed_ms = (time.monotonic() - start) * 1000
         success = resp.status_code == 200
         if success:
@@ -63,7 +68,7 @@ async def validate_single_proxy(proxy_url: str, url: Optional[str] = None) -> tu
         else:
             _record_url_failure(url)
         return success, elapsed_ms
-    except httpx.TimeoutException:
+    except (asyncio.TimeoutError, httpx.TimeoutException):
         _record_url_failure(url)
         return False, (time.monotonic() - start) * 1000
     except Exception:
@@ -77,53 +82,68 @@ async def _validate_proxy(proxy: Proxy) -> tuple[bool, float]:
 
 
 async def validate_all(progress_callback: Optional[Callable] = None) -> dict:
-    """批量验证所有代理"""
+    """批量验证所有代理：HTTP 检查并发执行，DB 更新批量落库"""
     async with async_session() as db:
         result = await db.execute(select(Proxy))
-        proxies = result.scalars().all()
+        proxies = list(result.scalars().all())
     total = len(proxies)
     logger.info("开始验证 %d 个代理...", total)
+    if total == 0:
+        return {"total": 0, "validated": 0, "success": 0}
 
-    validated = 0
-    success = 0
     semaphore = asyncio.Semaphore(VALIDATION_CONCURRENCY)
 
-    async def _limited_validate(proxy: Proxy):
-        nonlocal validated, success
+    async def _check(proxy: Proxy) -> tuple[bool, float]:
         async with semaphore:
-            ok, resp_time = await _validate_proxy(proxy)
+            return await _validate_proxy(proxy)
 
-            # 每个任务使用独立的会话更新数据库，避免共享会话并发访问
-            async with async_session() as s:
-                p = await s.get(Proxy, proxy.id)
-                if p:
-                    p.total_checks += 1
-                    p.last_checked_at = utcnow()
-                    p.response_time_ms = round(resp_time, 1)
-                    if ok:
-                        p.success_checks += 1
-                        p.consecutive_successes += 1
-                        p.consecutive_failures = 0
-                        p.last_success_at = utcnow()
-                    else:
-                        p.consecutive_successes = 0
-                        p.consecutive_failures += 1
-                    p.success_rate = round(p.success_checks / p.total_checks, 4) if p.total_checks > 0 else 0.0
-                    p.updated_at = utcnow()
-                await s.commit()
+    # (proxy_id, ok, response_time_ms)
+    results: list[tuple[int, bool, float]] = []
 
-            validated += 1
-            if ok:
-                success += 1
+    async def _run_checks():
+        for i in range(0, total, VALIDATION_CONCURRENCY):
+            batch = proxies[i : i + VALIDATION_CONCURRENCY]
+            batch_results = await asyncio.gather(*(_check(p) for p in batch))
+            results.extend((p.id, ok, rt) for p, (ok, rt) in zip(batch, batch_results))
+            if progress_callback:
+                await progress_callback(len(results), total, sum(1 for _, ok, _ in results if ok))
 
-            if progress_callback and validated % 100 == 0:
-                logger.info("进度: %d/%d (成功: %d, 失败: %d)", validated, total, success, validated - success)
-                await progress_callback(validated, total, success)
+    # 整体超时兜底：按批次上限估算（单代理上限 + 余量），防止意外挂起
+    overall_timeout = math.ceil(total / VALIDATION_CONCURRENCY) * (VALIDATION_TIMEOUT + 2)
+    logger.info("验证阶段整体超时上限: %.0f 秒", overall_timeout)
+    try:
+        await asyncio.wait_for(_run_checks(), timeout=overall_timeout)
+    except asyncio.TimeoutError:
+        logger.error("验证阶段整体超时（%.0f 秒），提前结束并保留已完成的结果", overall_timeout)
 
-    # 分批并发验证（每批不超过并发上限）
-    tasks = [_limited_validate(p) for p in proxies]
-    for i in range(0, len(tasks), VALIDATION_CONCURRENCY):
-        await asyncio.gather(*tasks[i : i + VALIDATION_CONCURRENCY])
+    validated = len(results)
+    success = sum(1 for _, ok, _ in results if ok)
+    logger.info("HTTP 验证完成: 共 %d 个, 成功 %d 个", validated, success)
 
-    logger.info("验证完成: 共 %d 个, 成功 %d 个", total, success)
+    # 批量写库（单 session、周期提交，降低并发写压力）
+    updated = 0
+    async with async_session() as db:
+        for start in range(0, len(results), DB_WRITE_BATCH_SIZE):
+            chunk = results[start : start + DB_WRITE_BATCH_SIZE]
+            for pid, ok, resp_time in chunk:
+                p = await db.get(Proxy, pid)
+                if not p:
+                    continue
+                p.total_checks += 1
+                p.last_checked_at = utcnow()
+                p.response_time_ms = round(resp_time, 1)
+                if ok:
+                    p.success_checks += 1
+                    p.consecutive_successes += 1
+                    p.consecutive_failures = 0
+                    p.last_success_at = utcnow()
+                else:
+                    p.consecutive_successes = 0
+                    p.consecutive_failures += 1
+                p.success_rate = round(p.success_checks / p.total_checks, 4) if p.total_checks > 0 else 0.0
+                p.updated_at = utcnow()
+                updated += 1
+            await db.commit()
+
+    logger.info("验证完成: 共 %d 个, 成功 %d 个, 落库 %d 条", validated, success, updated)
     return {"total": total, "validated": validated, "success": success}
